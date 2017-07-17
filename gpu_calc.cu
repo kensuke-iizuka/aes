@@ -3,6 +3,12 @@
 #include <math.h>
 #include "calculation.h"
 
+__device__ void SubBytes();
+__device__ void ShiftRows(int *state);
+__device__ void MixColumns();
+__device__ void AddRoundKey();
+__device__ void PrintText(int *state);
+__device__ void gpuCipher(int *state, int *rkey);
 
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
 
@@ -26,8 +32,22 @@ __device__ void SubBytes(){
 
 }
 
-__device__ void ShiftRows(){
+__device__ void ShiftRows(int *state){
+  int i, j, i4;
+  unsigned char *cb = (unsigned char*)state;
+  unsigned char cw[NBb];
+  memcpy(cw, cb, sizeof(cw));
 
+  for(i = 0;i < NB; i+=4){
+    i4 = i*4;
+    for(j = 1; j < 4; j++){
+      cw[i4+j+0*4] = cb[i4+j+((j+0)&3)*4];
+      cw[i4+j+1*4] = cb[i4+j+((j+1)&3)*4];
+      cw[i4+j+2*4] = cb[i4+j+((j+2)&3)*4];
+      cw[i4+j+3*4] = cb[i4+j+((j+3)&3)*4];
+    }
+  }
+  memcpy(cb,cw,sizeof(cw));
 }
 
 __device__ void MixColumns(){
@@ -43,7 +63,7 @@ __device__ void PrintText(int *state){
   }
   printf("\n");
 }
-__device__ void Cipher(int *state, int *rkey){
+__device__ void gpuCipher(int *state, int *rkey){
   // int rnd;
   // int i;
   //
