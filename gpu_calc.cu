@@ -3,10 +3,10 @@
 #include <math.h>
 #include "calculation.h"
 
-__device__ void SubBytes();
-__device__ void ShiftRows(int *state);
-__device__ void MixColumns();
-__device__ void AddRoundKey();
+__device__ void gpuSubBytes();
+__device__ void gpuShiftRows(int *state);
+__device__ void gpuMixColumns();
+__device__ void gpuAddRoundKey();
 __device__ void PrintText(int *state);
 __device__ void gpuCipher(int *state, int *rkey);
 
@@ -24,15 +24,15 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
   printf("This thread ID is %d.\n", thread_id);
 
   //...
-  PrintText(*data);
+  PrintText(data);
 }
 
 
-__device__ void SubBytes(){
+__device__ void gpuSubBytes(){
 
 }
 
-__device__ void ShiftRows(int *state){
+__device__ void gpuShiftRows(int *state){
   int i, j, i4;
   unsigned char *cb = (unsigned char*)state;
   unsigned char cw[NBb];
@@ -50,11 +50,11 @@ __device__ void ShiftRows(int *state){
   memcpy(cb,cw,sizeof(cw));
 }
 
-__device__ void MixColumns(){
+__device__ void gpuMixColumns(){
 
 }
 
-__device__ void AddRoundKey(){
+__device__ void gpuAddRoundKey(){
 
 }
 __device__ void PrintText(int *state){
