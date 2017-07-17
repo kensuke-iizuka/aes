@@ -9,7 +9,8 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
   //This kernel executes AES encryption on a GPU.
   //Please modify this kernel!!
   int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-
+  int data[16];
+  memcpy(data, pt, 16);
   if(thread_id == 0)
     printf("size = %ld\n", size);
 
@@ -17,10 +18,49 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
   printf("This thread ID is %d.\n", thread_id);
 
   //...
-  // SubBytes
-  // ShiftRows
-  // MixColumns
-  // AddRoundKey
+  PrintText(*data);
+}
+
+
+__device__ void SubBytes(){
+
+}
+
+__device__ void ShiftRows(){
+
+}
+
+__device__ void MixColumns(){
+
+}
+
+__device__ void AddRoundKey(){
+
+}
+__device__ void PrintText(int *state){
+  for (int i = 0; i < 16; i++) {
+    printf("%d ", state[i]);
+  }
+  printf("\n");
+}
+__device__ void Cipher(int *state, int *rkey){
+  // int rnd;
+  // int i;
+  //
+  // AddRoundKey();
+  //
+  // for(rnd = 1; rnd < NR; rnd++){
+  //   SubBytes(state);
+  //   ShiftRows(state);
+  //   MixColumns(state);
+  //   AddRoundKey(state, rkey, rnd);
+  // }
+  //
+  // SubBytes(state);
+  // ShiftRows(state);
+  // AddRoundKey(state, rkey, rnd);
+  //
+  // return 0;
 }
 
 void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int size){
