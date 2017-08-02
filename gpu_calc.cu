@@ -3,6 +3,13 @@
 #include <math.h>
 #include "calculation.h"
 
+#define NB (4)
+#define NBb (16)
+
+#define NK (4) 
+#define NR (10)
+#define FILESIZE (16*128*13*16*512)
+
 // int Sbox[256] = {
 //      0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
 //      0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
@@ -21,23 +28,28 @@
 //      0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
 //      0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
 // };
-__device__ void gpuSubBytes();
-__device__ void gpuShiftRows(int *state);
+__device__ void gpuSubBytes(int *);
+__device__ void gpuShiftRows(int *);
+__device__ int gpumul(int,int);
+__device__ int gpudataget(void*, int);
 __device__ void gpuMixColumns();
-__device__ void gpuAddRoundKey();
-__device__ void PrintText(unsigned char *state);
-__device__ void gpuCipher(int *state, int *rkey);
+__device__ void gpuAddRoundKey(int *, int *, int);
+//__device__ void PrintPlainText(unsigned char *);
+__device__ void PrintPlainText(int *);
+__device__ void gpuMixColumns(int *);
+__device__ void gpuCipher(int *, int *);
 
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
 
   //This kernel executes AES encryption on a GPU.
   //Please modify this kernel!!
-  unsigned char data[16];
+  int data[16];
   int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-  memcpy(data, pt + 16 *thread_id,16); 
+  memcpy(data, pt + (16 * thread_id),NBb); 
   if(thread_id == 2){
     //printf("size = %ld\n", size);
-    //PrintText(data);
+    gpuAddRoundKey(data, rkey, 0);
+    PrintPlainText(data);
   }
   // printf("You can use printf function to eliminate bugs in your kernel.\n");
   // printf("This thread ID is %d.\n", thread_id);
@@ -50,7 +62,7 @@ __device__ void gpuSubBytes(int *state){
   int i, j;
   unsigned char *cb=(unsigned char*)state;
   for(i=0; i<NBb; i+=4){
-    for(j=0; j<4; j++){
+    for(j=1; j<4; j++){
       //cb[i+j] = Sbox[cb[i+j]];
     }
   }
@@ -74,25 +86,64 @@ __device__ void gpuShiftRows(int *state){
   memcpy(cb,cw,sizeof(cw));
 }
 
-__device__ void gpuMixColumns(){
-
+__device__ int gpumul(int dt,int n){
+  int i, x = 0;
+  for(i = 8; i > 0; i >>= 1)
+    {
+      x <<= 1;
+      if(x & 0x100)
+        x = (x ^ 0x1b) & 0xff;
+      if((n & i))
+        x ^= dt;
+    }
+  return(x);
 }
 
-__device__ void gpuAddRoundKey(){
-
+__device__ int gpudataget(void* data, int n){
+  return(((unsigned char*)data)[n]);
 }
-__device__ void PrintText(unsigned char *state){
+
+__device__ void gpuMixColumns(int *state){
+  int i, i4, x;
+  for(i = 0; i< NB; i++){
+    i4 = i*4;
+    x  =  gpumul(gpudataget(state,i4+0),2) ^
+          gpumul(gpudataget(state,i4+1),3) ^
+          gpumul(gpudataget(state,i4+2),1) ^
+          gpumul(gpudataget(state,i4+3),1);
+    x |= (gpumul(gpudataget(state,i4+1),2) ^
+          gpumul(gpudataget(state,i4+2),3) ^
+          gpumul(gpudataget(state,i4+3),1) ^
+          gpumul(gpudataget(state,i4+0),1)) << 8;
+    x |= (gpumul(gpudataget(state,i4+2),2) ^
+          gpumul(gpudataget(state,i4+3),3) ^
+          gpumul(gpudataget(state,i4+0),1) ^
+          gpumul(gpudataget(state,i4+1),1)) << 16;
+    x |= (gpumul(gpudataget(state,i4+3),2) ^
+          gpumul(gpudataget(state,i4+0),3) ^
+          gpumul(gpudataget(state,i4+1),1) ^
+          gpumul(gpudataget(state,i4+2),1)) << 24;
+    state[i] = x;
+  }
+}
+
+__device__ void gpuAddRoundKey(int *state, int *w, int n){
+    int i;
+    for(i = 0; i < NB; i++) {
+        state[i] ^= w[i + NB * n];
+    }
+}
+//__device__ void PrintPlainText(unsigned char *state){
+__device__ void PrintPlainText(int *state){
   for (int i = 0; i < 16; i++) {
-    state[i] = state[i] *2 + 3;
     printf("%d\n", state[i]);
   }
-  printf("\n");
 }
 __device__ void gpuCipher(int *state, int *rkey){
   // int rnd;
   // int i;
   //
-  // AddRoundKey();
+  // AddRoundKey(state, rkey, 0);
   //
   // for(rnd = 1; rnd < NR; rnd++){
   //   SubBytes(state);
