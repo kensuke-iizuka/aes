@@ -6,7 +6,7 @@
 #define NB (4)
 #define NBb (16)
 
-#define NK (4) 
+#define NK (4)
 #define NR (10)
 #define FILESIZE (16*128*13*16*512)
 
@@ -45,7 +45,7 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
   //Please modify this kernel!!
   int data[16];
   int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-  memcpy(data, pt + (16 * thread_id),NBb); 
+  memcpy(data, pt + (16 * thread_id), NBb);
   if(thread_id == 2){
     //printf("size = %ld\n", size);
     gpuAddRoundKey(data, rkey, 0);
@@ -73,7 +73,7 @@ __device__ void gpuShiftRows(int *state){
   unsigned char *cb = (unsigned char*)state;
   unsigned char cw[NBb];
   memcpy(cw, cb, sizeof(cw));
-  
+
   for(i = 0;i < NB; i+=4){
     i4 = i*4;
     for(j = 1; j < 4; j++){
@@ -140,23 +140,23 @@ __device__ void PrintPlainText(int *state){
   }
 }
 __device__ void gpuCipher(int *state, int *rkey){
-  // int rnd;
-  // int i;
-  //
-  // AddRoundKey(state, rkey, 0);
-  //
-  // for(rnd = 1; rnd < NR; rnd++){
-  //   SubBytes(state);
-  //   ShiftRows(state);
-  //   MixColumns(state);
-  //   AddRoundKey(state, rkey, rnd);
-  // }
-  //
-  // SubBytes(state);
-  // ShiftRows(state);
-  // AddRoundKey(state, rkey, rnd);
-  //
-  // return 0;
+  int rnd;
+  int i;
+
+  AddRoundKey(state, rkey, 0);
+
+  for(rnd = 1; rnd < NR; rnd++){
+    SubBytes(state);
+    ShiftRows(state);
+    MixColumns(state);
+    AddRoundKey(state, rkey, rnd);
+  }
+
+  SubBytes(state);
+  ShiftRows(state);
+  AddRoundKey(state, rkey, rnd);
+
+  return 0;
 }
 
 void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int size){
