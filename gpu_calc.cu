@@ -19,11 +19,12 @@ __device__ void gpuMixColumns();
 __device__ void gpuAddRoundKey(int *, int *, int);
 __device__ void PrintPlainText(int *);
 __device__ void gpuMixColumns(int *);
-__device__ void ComputeTBoxes(int *,int *,int *,int *);
+__device__ void ComputeTBoxes(int *,int *,int *,int *,int *);
 __device__ unsigned long ConCat(unsigned char, unsigned char, unsigned char, unsigned char);
 __device__ unsigned char GFMult(unsigned char , unsigned char );
 __device__ void TBoxLUP(int *, int *, int *, int *);
 __device__ void gpuCipher(int *, int *,int *);
+__device__ void gpuCipher2(int *state, int *rkey, int *sbox, int *Tbox0, int *Tbox1, int *Tbox2, int *Tbox3);
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
     __shared__ int shareSbox[256];
     __shared__ int TBox0[256];
@@ -51,7 +52,7 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
     };
     memcpy(shareSbox, gpuSbox, sizeof(int) * 256);
     __syncthreads();
-    ComputeTBoxes(TBox0, TBox1, TBox2, TBox3);
+    ComputeTBoxes(shareSbox, TBox0, TBox1, TBox2, TBox3);
     __syncthreads();
     //This kernel executes AES encryption on a GPU.
     //Please modify this kernel!!
@@ -60,7 +61,7 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
     int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
     memcpy(data, pt+16*thread_id, NBb); //With NB, 16 bytes are defined as 4 words.
 
-    gpuCipher(data, rkey, shareSbox);
+    gpuCipher2(data, rkey, shareSbox, TBox0, TBox1, TBox2, TBox3);
     memcpy(ct+16*thread_id, data, NBb);
 }
 
@@ -180,14 +181,6 @@ __device__ void PrintPlainText(int *state){
 //   }
 //   printf("\n");
 // }
-__device__ void ComputeTBoxes(int *Sbox, int *TBox0, int *TBox1, int *TBox2, int *TBox3){
-	for(int i = 0; i < 256; i++){
-		TBox0[i] = ConCat( GFMult(Sbox[i], 02), Sbox[i], Sbox[i], GFMult(Sbox[i], 03) );
-		TBox1[i] = ConCat( GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i], Sbox[i] );
-		TBox2[i] = ConCat( Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i] );
-		TBox3[i] = ConCat( Sbox[i], Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02) );
-	}
-}
 
 // concatenate four byte to a dword
 __device__ unsigned long ConCat(unsigned char b0, unsigned char b1, unsigned char b2, unsigned char b3){
@@ -218,6 +211,15 @@ __device__ unsigned char GFMult(unsigned char bFac1, unsigned char bFac2) {
 	}
 	return p;
 }
+__device__ void ComputeTBoxes(int *Sbox, int *TBox0, int *TBox1, int *TBox2, int *TBox3){
+	for(int i = 0; i < 256; i++){
+		TBox0[i] = ConCat( GFMult(Sbox[i], 02), Sbox[i], Sbox[i], GFMult(Sbox[i], 03) );
+		TBox1[i] = ConCat( GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i], Sbox[i] );
+		TBox2[i] = ConCat( Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i] );
+		TBox3[i] = ConCat( Sbox[i], Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02) );
+	}
+}
+
 __device__ void TBoxLUP(int *state, int *TBox0, int *TBox1, int *TBox2, int *TBox3) {
 
     unsigned char *cb = (unsigned char*)state;
@@ -261,15 +263,15 @@ __device__ void gpuCipher(int *state, int *rkey, int *sbox){
 
   //return 0;
 }
-__device__ void gpuCipher2(int *state, int *rkey, int *sbox){
+__device__ void gpuCipher2(int *state, int *rkey, int *sbox, int *TBox0, int *TBox1, int *TBox2, int *TBox3){
   int rnd;
 
   gpuAddRoundKey(state, rkey, 0);
 
 #pragma unroll
-  for(int i = 1; i <= 9; i++){
-    TBoxLUP(state);
-    gpuAddRoundKey(state, rKey, i);
+  for(rnd = 1; rnd <NR; rnd++){
+    TBoxLUP(state, TBox0, TBox1, TBox2, TBox3);
+    gpuAddRoundKey(state, rkey, rnd);
   }
   gpuSubBytes(state, sbox);
   gpuShiftRows(state);
