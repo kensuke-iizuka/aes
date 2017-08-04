@@ -19,6 +19,7 @@ __device__ void gpuMixColumns();
 __device__ void gpuAddRoundKey(int *, int *, int);
 __device__ void PrintPlainText(int *);
 __device__ void gpuMixColumns(int *);
+__device__ void TBoxLUP(int *, int *, int *, int *);
 __device__ void gpuCipher(int *, int *,int *);
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
     __shared__ int shareSbox[256];
@@ -169,6 +170,30 @@ __device__ void PrintPlainText(int *state){
 //   }
 //   printf("\n");
 // }
+__device__ void TBoxLUP(int *state, int *TBox0, int *TBox1, int *TBox2, int *TBox3) {
+
+    unsigned char *cb = (unsigned char*)state;
+    unsigned long e0 = TBox0[cb[0]] ^ TBox1[cb[5]] ^ TBox2[cb[10]] ^ TBox3[cb[15]];
+    unsigned long e1 = TBox0[cb[4]] ^ TBox1[cb[9]] ^ TBox2[cb[14]] ^ TBox3[cb[3]];
+    unsigned long e2 = TBox0[cb[8]] ^ TBox1[cb[13]] ^ TBox2[cb[2]] ^ TBox3[cb[7]];
+    unsigned long e3 = TBox0[cb[12]] ^ TBox1[cb[1]] ^ TBox2[cb[6]] ^ TBox3[cb[11]];
+    cb[0] = (e0 >> 24) & 0xff;
+    cb[1] = (e0 >> 16) & 0xff;
+    cb[2] = (e0 >> 8) & 0xff;
+    cb[3] = e0 & 0xff;
+    cb[4] = (e1 >> 24) & 0xff;
+    cb[5] = (e1 >> 16) & 0xff;
+    cb[6] = (e1 >> 8) & 0xff;
+    cb[7] = e1 & 0xff;
+    cb[8] = (e2 >> 24) & 0xff;
+    cb[9] = (e2 >> 16) & 0xff;
+    cb[10] = (e2 >> 8) & 0xff;
+    cb[11] = e2 & 0xff;
+    cb[12] = (e3 >> 24) & 0xff;
+    cb[13] = (e3 >> 16) & 0xff;
+    cb[14] = (e3 >> 8) & 0xff;
+    cb[15] = e3 & 0xff;
+}
 __device__ void gpuCipher(int *state, int *rkey, int *sbox){
   int rnd;
 
