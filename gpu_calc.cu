@@ -9,7 +9,7 @@
 #define NK (4)
 #define NR (10)
 #define FILESIZE (16*128*13*16*512)
-#define STREAM_NUM (16)
+#define STREAM_NUM (32)
 
 __device__ void gpuSubBytes(int *,int *);
 __device__ void gpuShiftRows(int *);
@@ -179,25 +179,22 @@ void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int s
   unsigned char *d_pt, *d_ct;
   int *d_rkey;
   unsigned int length = FILESIZE / STREAM_NUM;
-  unsigned int char_ptr = sizeof(unsigned char) * length;
+  //unsigned int char_ptr = sizeof(unsigned char) * length;
   cudaMalloc((void **)&d_pt, sizeof(unsigned char)*size);
   cudaMalloc((void **)&d_rkey, sizeof(int)*44);
   cudaMalloc((void **)&d_ct, sizeof(unsigned char)*size);
   
 
-// TODO:Stream
+// TODO:Using Stream
   dim3 dim_grid(FILESIZE/16/512/STREAM_NUM,1,1), dim_block(512,1,1);
   cudaStream_t streams[STREAM_NUM];
   cudaMemcpy(d_rkey, rk, sizeof(int)*44, cudaMemcpyHostToDevice);
 
   for (int i = 0; i < STREAM_NUM; i++){
-      // const int curStream = 1 % STREAM_NUM;
-      //const int curStream = i;
       cudaStreamCreate(&streams[i]);
   }
 
   for (int i = 0; i < STREAM_NUM; i++){
-      // const int curStream = 1 % STREAM_NUM;
       const int curStream = i;
       int pt_d = i * length;
       
