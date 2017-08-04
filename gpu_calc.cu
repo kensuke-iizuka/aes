@@ -19,10 +19,18 @@ __device__ void gpuMixColumns();
 __device__ void gpuAddRoundKey(int *, int *, int);
 __device__ void PrintPlainText(int *);
 __device__ void gpuMixColumns(int *);
+__device__ void ComputeTBoxes(int *,int *,int *,int *);
+__device__ unsigned long ConCat(unsigned char, unsigned char, unsigned char, unsigned char);
+__device__ unsigned char GFMult(unsigned char , unsigned char );
 __device__ void TBoxLUP(int *, int *, int *, int *);
 __device__ void gpuCipher(int *, int *,int *);
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
     __shared__ int shareSbox[256];
+    __shared__ int TBox0[256];
+    __shared__ int TBox1[256];
+    __shared__ int TBox2[256];
+    __shared__ int TBox3[256];
+
     int gpuSbox[256] = {
          0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
          0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
@@ -43,13 +51,15 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
     };
     memcpy(shareSbox, gpuSbox, sizeof(int) * 256);
     __syncthreads();
+    ComputeTBoxes(TBox0, TBox1, TBox2, TBox3);
+    __syncthreads();
     //This kernel executes AES encryption on a GPU.
     //Please modify this kernel!!
 
     int data[NBb];
     int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
     memcpy(data, pt+16*thread_id, NBb); //With NB, 16 bytes are defined as 4 words.
-    
+
     gpuCipher(data, rkey, shareSbox);
     memcpy(ct+16*thread_id, data, NBb);
 }
@@ -71,7 +81,7 @@ __device__ void gpuSubBytes(int *state, int *gpuSbox){
 //   unsigned char *cb = (unsigned char*)state;
 //   unsigned char cw[NBb];
 //   memcpy(cw, cb, sizeof(cw));
-// 
+//
 //   for(i = 0;i < NB; i+=4){
 //     i4 = i*4;
 // #pragma unroll
@@ -170,6 +180,44 @@ __device__ void PrintPlainText(int *state){
 //   }
 //   printf("\n");
 // }
+__device__ void ComputeTBoxes(int *Sbox, int *TBox0, int *TBox1, int *TBox2, int *TBox3){
+	for(int i = 0; i < 256; i++){
+		TBox0[i] = ConCat( GFMult(Sbox[i], 02), Sbox[i], Sbox[i], GFMult(Sbox[i], 03) );
+		TBox1[i] = ConCat( GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i], Sbox[i] );
+		TBox2[i] = ConCat( Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02), Sbox[i] );
+		TBox3[i] = ConCat( Sbox[i], Sbox[i], GFMult(Sbox[i], 03), GFMult(Sbox[i], 02) );
+	}
+}
+
+// concatenate four byte to a dword
+__device__ unsigned long ConCat(unsigned char b0, unsigned char b1, unsigned char b2, unsigned char b3){
+	unsigned long dwDword = 0;
+	dwDword += b0;
+	dwDword = (dwDword << 8);
+	dwDword += b1;
+	dwDword = (dwDword << 8);
+	dwDword += b2;
+	dwDword = (dwDword << 8);
+	dwDword += b3;
+	return dwDword;
+}
+
+// multiply in GF 2^8 and reduce by AES polynom if necessary
+__device__ unsigned char GFMult(unsigned char bFac1, unsigned char bFac2) {
+	unsigned char p = 0;
+	unsigned char counter;
+	unsigned char hi_bit_set;
+	for(counter = 0; counter < 8; counter++) {
+		if((bFac2 & 1) == 1)
+			p ^= bFac1;
+		hi_bit_set = (bFac1 & 0x80);
+		bFac1 <<= 1;
+		if(hi_bit_set == 0x80)
+			bFac1 ^= 0x1b;
+		bFac2 >>= 1;
+	}
+	return p;
+}
 __device__ void TBoxLUP(int *state, int *TBox0, int *TBox1, int *TBox2, int *TBox3) {
 
     unsigned char *cb = (unsigned char*)state;
@@ -213,7 +261,21 @@ __device__ void gpuCipher(int *state, int *rkey, int *sbox){
 
   //return 0;
 }
+__device__ void gpuCipher2(int *state, int *rkey, int *sbox){
+  int rnd;
 
+  gpuAddRoundKey(state, rkey, 0);
+
+#pragma unroll
+  for(int i = 1; i <= 9; i++){
+    TBoxLUP(state);
+    gpuAddRoundKey(state, rKey, i);
+  }
+  gpuSubBytes(state, sbox);
+  gpuShiftRows(state);
+  gpuAddRoundKey(state, rkey, rnd);
+  //return 0;
+}
 void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int size){
 
   //This function launches the AES kernel.
@@ -227,7 +289,7 @@ void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int s
   cudaMalloc((void **)&d_pt, sizeof(unsigned char)*size);
   cudaMalloc((void **)&d_rkey, sizeof(int)*44);
   cudaMalloc((void **)&d_ct, sizeof(unsigned char)*size);
-  
+
 
 // TODO:Using Stream
   dim3 dim_grid(FILESIZE/16/512/STREAM_NUM,1,1), dim_block(512,1,1);
@@ -241,7 +303,7 @@ void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int s
   for (int i = 0; i < STREAM_NUM; i++){
       const int curStream = i;
       int pt_d = i * length;
-      
+
       cudaMemcpyAsync(d_pt + pt_d, pt+ pt_d, sizeof(unsigned char)*length, cudaMemcpyHostToDevice, streams[curStream]);
       device_aes_encrypt<<<dim_grid, dim_block, 0, streams[curStream]>>>(d_pt + pt_d, d_rkey, d_ct + pt_d, size);
   }
