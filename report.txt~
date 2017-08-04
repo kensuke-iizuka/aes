@@ -1,0 +1,10 @@
+1, 
+2, Result
+
+Elapsed time on CPU: 11771.171875 [msec]
+Elapsed time on GPU: 80.055550 [msec]
+Acceleration rate  : 147.037552 times faster than the CPU
+######### The case of initial 16 bytes (for error check) #######
+Plaintext        : 00112233445566778899aabbccddeeff
+Ciphertext on CPU: 69c4e0d86a7b0430d8cdb78070b4c55a
+Ciphertext on GPU: 69c4e0d86a7b0430d8cdb78070b4c55a

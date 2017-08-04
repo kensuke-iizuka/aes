@@ -65,22 +65,41 @@ __device__ void gpuSubBytes(int *state, int *gpuSbox){
     }
 }
 
+// __device__ void gpuShiftRows(int *state){
+//   int i, j, i4;
+//   unsigned char *cb = (unsigned char*)state;
+//   unsigned char cw[NBb];
+//   memcpy(cw, cb, sizeof(cw));
+// 
+//   for(i = 0;i < NB; i+=4){
+//     i4 = i*4;
+// #pragma unroll
+//     for(j = 1; j < 4; j++){
+//       cw[i4+j+0*4] = cb[i4+j+((j+0)&3)*4];
+//       cw[i4+j+1*4] = cb[i4+j+((j+1)&3)*4];
+//       cw[i4+j+2*4] = cb[i4+j+((j+2)&3)*4];
+//       cw[i4+j+3*4] = cb[i4+j+((j+3)&3)*4];
+//     }
+//   }
+//   memcpy(cb,cw,sizeof(cw));
+// }
 __device__ void gpuShiftRows(int *state){
-  int i, j, i4;
   unsigned char *cb = (unsigned char*)state;
   unsigned char cw[NBb];
   memcpy(cw, cb, sizeof(cw));
+  cw[1] = cb[5];
+  cw[5] = cb[9];
+  cw[9] = cb[13];
+  cw[13] = cb[1];
+  cw[2] = cb[10];
+  cw[6] = cb[14];
+  cw[10] = cb[2];
+  cw[14] = cb[6];
+  cw[3] = cb[15];
+  cw[7] = cb[3];
+  cw[11] = cb[7];
+  cw[15] = cb[11];
 
-  for(i = 0;i < NB; i+=4){
-    i4 = i*4;
-#pragma unroll
-    for(j = 1; j < 4; j++){
-      cw[i4+j+0*4] = cb[i4+j+((j+0)&3)*4];
-      cw[i4+j+1*4] = cb[i4+j+((j+1)&3)*4];
-      cw[i4+j+2*4] = cb[i4+j+((j+2)&3)*4];
-      cw[i4+j+3*4] = cb[i4+j+((j+3)&3)*4];
-    }
-  }
   memcpy(cb,cw,sizeof(cw));
 }
 
