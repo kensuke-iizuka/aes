@@ -9,20 +9,21 @@
 #define NK (4)
 #define NR (10)
 #define FILESIZE (16*128*13*16*512)
-#define STREAM_NUM (16)
 
-__device__ void gpuSubBytes(int *,int *);
+__device__ void gpuSubBytes(int *);
 __device__ void gpuShiftRows(int *);
 __device__ int gpumul(int,int);
 __device__ int gpudataget(void*, int);
 __device__ void gpuMixColumns();
 __device__ void gpuAddRoundKey(int *, int *, int);
+//__device__ void PrintPlainText(unsigned char *);
 __device__ void PrintPlainText(int *);
+__device__ void gpudatadump(const char *, void *, int);
 __device__ void gpuMixColumns(int *);
-__device__ void gpuCipher(int *, int *,int *);
+__device__ void gpuCipher(int *, int *);
+
 __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *ct, long int size){
-    __shared__ int shareSbox[256];
-    int gpuSbox[256] = {
+    int Sbox[256] = {
          0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
          0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
          0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
@@ -40,27 +41,74 @@ __global__ void device_aes_encrypt(unsigned char *pt, int *rkey, unsigned char *
          0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,
          0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
     };
-    memcpy(shareSbox, gpuSbox, sizeof(int) * 256);
-    __syncthreads();
+
     //This kernel executes AES encryption on a GPU.
     //Please modify this kernel!!
-
-    int data[NBb];
+    int data[NB];
     int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
     memcpy(data, pt+16*thread_id, NBb); //With NB, 16 bytes are defined as 4 words.
     
-    gpuCipher(data, rkey, shareSbox);
-    memcpy(ct+16*thread_id, data, NBb);
+    if(thread_id == 0){
+        //printf("size = %ld\n", size);
+        //PrintPlainText(data);
+        // printf("----ViewRoundKey----\n");
+	// for (int j = 0; j < 44; j++){
+	//     printf("%x\n", rkey[j]);
+	// }
+        // gpuAddRoundKey(data, rkey, 0);
+        // printf("----addRoundKey[0]----\n");
+        // PrintPlainText(data);
+        // for (int rnd = 0; rnd < 10; rnd++){
+        //     // SubBytes
+        //     unsigned char *cb = (unsigned char*)data;
+        //     for(int i=0; i<NBb; i+=4){
+        //         for(int j=1; j<4; j++){
+        //             cb[i+j] = Sbox[cb[i+j]];
+        //         }
+        //     }
+        //     printf("----SubBytes----\n");
+        //     PrintPlainText(data);
+            //printf("----ShiftRows----\n");
+            gpuShiftRows(data);
+            //PrintPlainText(data);
+        //     printf("----MixColumns----\n");
+        //     gpuMixColumns(data);
+        //     PrintPlainText(data);
+        //     printf("----AddRoundkey[%d]----\n", rnd);
+        //     gpuAddRoundKey(data, rkey, rnd);
+        //     PrintPlainText(data);
+        //     printf("--------\n");
+        //     PrintPlainText(data);
+        // }
+        // printf("----SubBytes----\n");
+        // PrintPlainText(data);
+        // printf("----ShiftRows----\n");
+        // gpuShiftRows(data);
+        // PrintPlainText(data);
+        // printf("----AddRoundkey[10]----\n");
+        // gpuAddRoundKey(data, rkey, 10);
+        // printf("----FINISH----\n");
+        // PrintPlainText(data);
+	//for (int k = 0; k < 4; k++){
+	//    printf("%02x", data[k]);
+	//}    
+	memcpy(ct+16*thread_id, data, NBb);
+        //gpudatadump("Ciphertext    : ", ct, 4);
+    }
+    // }
+    // printf("You can use printf function to eliminate bugs in your kernel.\n");
+    // printf("This thread ID is %d.\n", thread_id);
+
+    //...
 }
 
 
-__device__ void gpuSubBytes(int *state, int *gpuSbox){
+__device__ void gpuSubBytes(int *state){
     int i, j;
     unsigned char *cb=(unsigned char*)state;
-#pragma unroll
     for(i=0; i<NBb; i+=4){
-        for(j=0; j<4; j++){
-            cb[i+j] = gpuSbox[cb[i+j]];
+        for(j=1; j<4; j++){
+            //cb[i+j] = Sbox[cb[i+j]];
         }
     }
 }
@@ -73,7 +121,6 @@ __device__ void gpuShiftRows(int *state){
 
   for(i = 0;i < NB; i+=4){
     i4 = i*4;
-#pragma unroll
     for(j = 1; j < 4; j++){
       cw[i4+j+0*4] = cb[i4+j+((j+0)&3)*4];
       cw[i4+j+1*4] = cb[i4+j+((j+1)&3)*4];
@@ -86,7 +133,6 @@ __device__ void gpuShiftRows(int *state){
 
 __device__ int gpumul(int dt,int n){
   int i, x = 0;
-#pragma unroll
   for(i = 8; i > 0; i >>= 1)
     {
       x <<= 1;
@@ -128,11 +174,11 @@ __device__ void gpuMixColumns(int *state){
 
 __device__ void gpuAddRoundKey(int *state, int *w, int n){
     int i;
-#pragma unroll
     for(i = 0; i < NB; i++) {
         state[i] ^= w[i + NB * n];
     }
 }
+//__device__ void PrintPlainText(unsigned char *state){
 __device__ void PrintPlainText(int *state){
   int i;
   unsigned char *cdt = (unsigned char *)state;
@@ -141,29 +187,29 @@ __device__ void PrintPlainText(int *state){
   }
   printf("\n");
 }
-// __device__ void gpudatadump(const char *c, void *dt, int len){
-//   int i;
-//   unsigned char *cdt = (unsigned char *)dt;
-//   printf("%s", c);
-//   for(i = 0; i < len*4;i++){
-//     printf("%02x", cdt[i]);
-//   }
-//   printf("\n");
-// }
-__device__ void gpuCipher(int *state, int *rkey, int *sbox){
+__device__ void gpudatadump(const char *c, void *dt, int len){
+  int i;
+  unsigned char *cdt = (unsigned char *)dt;
+  printf("%s", c);
+  for(i = 0; i < len*4;i++){
+    printf("%02x", cdt[i]);
+  }
+  printf("\n");
+}
+__device__ void gpuCipher(int *state, int *rkey){
   int rnd;
+  //int i;
 
   gpuAddRoundKey(state, rkey, 0);
 
-#pragma unroll
   for(rnd = 1; rnd < NR; rnd++){
-    gpuSubBytes(state, sbox);
+    gpuSubBytes(state);
     gpuShiftRows(state);
     gpuMixColumns(state);
     gpuAddRoundKey(state, rkey, rnd);
   }
 
-  gpuSubBytes(state, sbox);
+  gpuSubBytes(state);
   gpuShiftRows(state);
   gpuAddRoundKey(state, rkey, rnd);
 
@@ -178,58 +224,21 @@ void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int s
 
   unsigned char *d_pt, *d_ct;
   int *d_rkey;
-  unsigned int length = FILESIZE / STREAM_NUM;
-  unsigned int char_ptr = sizeof(unsigned char) * length;
+
+  dim3 dim_grid(FILESIZE/16/512,1,1), dim_block(512,1,1);
+
   cudaMalloc((void **)&d_pt, sizeof(unsigned char)*size);
   cudaMalloc((void **)&d_rkey, sizeof(int)*44);
   cudaMalloc((void **)&d_ct, sizeof(unsigned char)*size);
-  
 
-// TODO:Stream
-  dim3 dim_grid(FILESIZE/16/512/STREAM_NUM,1,1), dim_block(512,1,1);
-  cudaStream_t streams[STREAM_NUM];
+  //cudaMemset(d_pt, 0, sizeof(unsigned char)*size);
+  cudaMemcpy(d_pt, pt, sizeof(unsigned char)*size, cudaMemcpyHostToDevice);
   cudaMemcpy(d_rkey, rk, sizeof(int)*44, cudaMemcpyHostToDevice);
 
-  for (int i = 0; i < STREAM_NUM; i++){
-      // const int curStream = 1 % STREAM_NUM;
-      //const int curStream = i;
-      cudaStreamCreate(&streams[i]);
-  }
+  device_aes_encrypt<<<dim_grid, dim_block>>>(d_pt, d_rkey, d_ct, size);
 
-  for (int i = 0; i < STREAM_NUM; i++){
-      // const int curStream = 1 % STREAM_NUM;
-      const int curStream = i;
-      int pt_d = i * length;
-      
-      cudaMemcpyAsync(d_pt + pt_d, pt+ pt_d, sizeof(unsigned char)*length, cudaMemcpyHostToDevice, streams[curStream]);
-      device_aes_encrypt<<<dim_grid, dim_block, 0, streams[curStream]>>>(d_pt + pt_d, d_rkey, d_ct + pt_d, size);
-  }
+  cudaMemcpy(ct, d_ct, sizeof(unsigned char)*size, cudaMemcpyDeviceToHost);
 
-  for (int i = 0; i < STREAM_NUM; i++){
-      int pt_d = i * length;
-      cudaMemcpyAsync(ct + pt_d, d_ct+ pt_d, sizeof(unsigned char)*length, cudaMemcpyDeviceToHost, streams[i]);
-  }
-
-  for (int i = 0; i < STREAM_NUM; i++){
-      cudaStreamSynchronize(streams[i]);
-      cudaStreamDestroy(streams[i]);
-  }
-
-  //Normal Mode
-  // dim3 dim_grid(FILESIZE/16/512,1,1), dim_block(512,1,1);
-
-  // cudaMalloc((void **)&d_pt, sizeof(unsigned char)*size);
-  // cudaMalloc((void **)&d_rkey, sizeof(int)*44);
-  // cudaMalloc((void **)&d_ct, sizeof(unsigned char)*size);
-
-  // cudaMemset(d_pt, 0, sizeof(unsigned char)*size);
-  // cudaMemcpy(d_pt, pt, sizeof(unsigned char)*size, cudaMemcpyHostToDevice);
-  // cudaMemcpy(d_rkey, rk, sizeof(int)*44, cudaMemcpyHostToDevice);
-
-  // device_aes_encrypt<<<dim_grid, dim_block>>>(d_pt, d_rkey, d_ct, size);
-
-  // cudaMemcpy(ct, d_ct, sizeof(unsigned char)*size, cudaMemcpyDeviceToHost);
-
-  //cudaFree(d_pt);
-  //cudaFree(d_ct);
+  cudaFree(d_pt);
+  cudaFree(d_ct);
 }

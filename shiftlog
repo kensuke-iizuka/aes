@@ -1,0 +1,13 @@
+initialize..
+Plaintext        : 00112233445566778899aabbccddeeff
+00112233445566778899aabbccddeeff
+----ShiftRows----
+0055aaff0099ee3300dd2277001166bb
+ffaa550033ee99007722dd00bb661100Ciphertext    : dd42f49251aa8323cb9b9addee290a9a
+Elapsed time on CPU: 11435.102539 [msec]
+Elapsed time on GPU: 97.317856 [msec]
+Acceleration rate  : 117.502617 times faster than the CPU
+######### The case of initial 16 bytes (for error check) #######
+Plaintext        : 00112233445566778899aabbccddeeff
+Ciphertext on CPU: 69c4e0d86a7b0430d8cdb78070b4c55a
+Ciphertext on GPU: dd42f49251aa8323cb9b9addee290a9a

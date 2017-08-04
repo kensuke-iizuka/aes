@@ -130,7 +130,6 @@ void Cipher(int *state, int *rkey){
   int i;
 
   AddRoundKey(state, rkey, 0);
-
   for(rnd = 1; rnd < NR; rnd++){
     SubBytes(state);
     ShiftRows(state);
@@ -211,8 +210,6 @@ void launch_cpu_aes(unsigned char *pt, int *rk, unsigned char *ct, long int size
   for(int i = 0; i < (size / 16); i++){
     memcpy(data, pt+16*i, NBb); //With NB, 16 bytes are defined as 4 words.
     
-    //datadump("Plaintext        : ", data, 4);      
-      
     Cipher(data, rk);
 
     memcpy(ct+16*i, data, NBb);

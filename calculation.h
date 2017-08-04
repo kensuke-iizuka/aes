@@ -22,6 +22,7 @@ int SubWord(int in);                  /* FIPS 197  P.20 Figure 11 */ /* FIPS 197
 int RotWord(int in);                  /* FIPS 197  P.20 Figure 11 */ /* FIPS 197  P.19  5.2 */
 void KeyExpansion(void *, int *);     /* FIPS 197  P.20 Figure 11 */
 void Cipher(int *, int *);            /* FIPS 197  P.15 Figure  5 */
+void datadump(const char *, void *, int);
 
 void launch_cpu_aes(unsigned char *in, int *rkey, unsigned char *out, long int size);
 void launch_aes_kernel(unsigned char *pt, int *rk, unsigned char *ct, long int size);
